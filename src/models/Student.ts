@@ -6,11 +6,11 @@ export interface IGrade {
 }
 
 export interface IStudent extends Document {
-  studentId: string; // Unique student ID
+  studentId: string; // Unique student ID (auto-generated)
   name: string;
-  email: string; // Added email field
+  email: string;
   age: number;
-  gradeLevel: string; // Changed from 'class' to 'gradeLevel' to match acceptance criteria
+  gradeLevel: string;
   grades: IGrade[];
   createdAt: Date;
   updatedAt: Date;
@@ -30,9 +30,9 @@ const GradeSchema: Schema = new Schema<IGrade>({
 const StudentSchema: Schema = new Schema<IStudent>({
   studentId: {
     type: String,
-    required: true,
     unique: true,
     trim: true
+    // Removed 'required: true' since we'll auto-generate it
   },
   name: {
     type: String,
@@ -69,11 +69,17 @@ const StudentSchema: Schema = new Schema<IStudent>({
 // Generate unique student ID before saving
 StudentSchema.pre('save', async function(next) {
   if (!this.studentId) {
-    const year = new Date().getFullYear();
-    const count = await mongoose.model('Student').countDocuments();
-    this.studentId = `STU-${year}-${String(count + 1).padStart(4, '0')}`;
+    try {
+      const year = new Date().getFullYear();
+      const count = await mongoose.model('Student').countDocuments();
+      this.studentId = `STU-${year}-${String(count + 1).padStart(4, '0')}`;
+      next();
+    } catch (error) {
+      next(error instanceof Error ? error : new Error('Unknown error occurred'));
+    }
+  } else {
+    next();
   }
-  next();
 });
 
-export default mongoose.model<IStudent>('Student', StudentSchema)
+export default mongoose.model<IStudent>('Student', StudentSchema);

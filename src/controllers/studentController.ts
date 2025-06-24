@@ -10,26 +10,51 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
     if (!name || !email || !age || !gradeLevel) {
       res.status(400).json({ 
         error: 'Missing required fields',
-        required: ['name', 'email', 'age', 'gradeLevel']
+        required: ['name', 'email', 'age', 'gradeLevel'],
+        received: {
+          name: !!name,
+          email: !!email,
+          age: !!age,
+          gradeLevel: !!gradeLevel
+        }
+      });
+      return;
+    }
+
+    // Additional validation
+    if (typeof age !== 'number' || age < 3 || age > 25) {
+      res.status(400).json({ 
+        error: 'Age must be a number between 3 and 25' 
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ 
+        error: 'Invalid email format' 
       });
       return;
     }
 
     // Check if student with email already exists
-    const existingStudent = await Student.findOne({ email });
+    const existingStudent = await Student.findOne({ email: email.toLowerCase().trim() });
     if (existingStudent) {
       res.status(409).json({ 
-        error: 'Student with this email already exists' 
+        error: 'Student with this email already exists',
+        conflictField: 'email'
       });
       return;
     }
 
     // If studentId is provided, check if it's unique
     if (studentId) {
-      const existingId = await Student.findOne({ studentId });
+      const existingId = await Student.findOne({ studentId: studentId.trim() });
       if (existingId) {
         res.status(409).json({ 
-          error: 'Student ID already exists' 
+          error: 'Student ID already exists',
+          conflictField: 'studentId'
         });
         return;
       }
@@ -47,6 +72,7 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
     const student = await Student.create(studentData);
 
     res.status(201).json({
+      success: true,
       message: 'Student added successfully',
       student: {
         id: student._id,
@@ -74,9 +100,10 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
 
     // Handle duplicate key errors
     if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
+      const field = Object.keys(error.keyPattern || {})[0];
       res.status(409).json({ 
-        error: `${field} already exists` 
+        error: `Duplicate ${field}: This ${field} already exists`,
+        conflictField: field
       });
       return;
     }
@@ -91,11 +118,28 @@ export const addStudent = async (req: Request, res: Response): Promise<void> => 
 // Get all students
 export const getAllStudents = async (req: Request, res: Response): Promise<void> => {
   try {
-    const students = await Student.find({}, '-grades').sort({ createdAt: -1 });
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const students = await Student.find({}, '-grades')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
     
+    const totalStudents = await Student.countDocuments();
+    const totalPages = Math.ceil(totalStudents / limit);
+
     res.json({
+      success: true,
       message: 'Students retrieved successfully',
-      count: students.length,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalStudents,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      },
       students: students.map(student => ({
         id: student._id,
         studentId: student.studentId,
@@ -110,7 +154,8 @@ export const getAllStudents = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     console.error('Error fetching students:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch students' 
+      error: 'Failed to fetch students',
+      message: 'An internal server error occurred'
     });
   }
 };
@@ -119,6 +164,14 @@ export const getAllStudents = async (req: Request, res: Response): Promise<void>
 export const getStudentById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      res.status(400).json({ 
+        error: 'Invalid student ID format' 
+      });
+      return;
+    }
     
     const student = await Student.findById(id);
     if (!student) {
@@ -129,6 +182,7 @@ export const getStudentById = async (req: Request, res: Response): Promise<void>
     }
 
     res.json({
+      success: true,
       message: 'Student retrieved successfully',
       student: {
         id: student._id,
@@ -146,7 +200,8 @@ export const getStudentById = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     console.error('Error fetching student:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch student' 
+      error: 'Failed to fetch student',
+      message: 'An internal server error occurred'
     });
   }
-}
+};
