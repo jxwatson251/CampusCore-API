@@ -3,15 +3,71 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    role: string;
+  };
+}
+
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
+  
+  if (!token) {
+    res.status(401).json({ 
+      error: 'Access denied. No token provided.' 
+    });
+    return;
+  }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    (req as any).user = decoded;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    req.user = {
+      userId: decoded.userId,
+      role: decoded.role
+    };
     next();
   } catch (err) {
-    res.status(400).json({ error: 'Invalid token' });
+    res.status(400).json({ 
+      error: 'Invalid token' 
+    });
   }
+};
+
+// Authorization middleware for admin-only routes
+export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ 
+      error: 'Authentication required' 
+    });
+    return;
+  }
+
+  if (req.user.role !== 'admin') {
+    res.status(403).json({ 
+      error: 'Access denied. Admin privileges required.' 
+    });
+    return;
+  }
+
+  next();
+};
+
+// Authorization middleware for admin or teacher roles
+export const requireAdminOrTeacher = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ 
+      error: 'Authentication required' 
+    });
+    return;
+  }
+
+  if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+    res.status(403).json({ 
+      error: 'Access denied. Admin or teacher privileges required.' 
+    });
+    return;
+  }
+
+  next();
 };

@@ -6,10 +6,14 @@ export interface IGrade {
 }
 
 export interface IStudent extends Document {
+  studentId: string; // Unique student ID
   name: string;
+  email: string; // Added email field
   age: number;
-  class: string;
+  gradeLevel: string; // Changed from 'class' to 'gradeLevel' to match acceptance criteria
   grades: IGrade[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const GradeSchema: Schema = new Schema<IGrade>({
@@ -24,18 +28,35 @@ const GradeSchema: Schema = new Schema<IGrade>({
 }, { _id: false });
 
 const StudentSchema: Schema = new Schema<IStudent>({
+  studentId: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
   name: {
     type: String,
     required: true,
     trim: true
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
   age: {
     type: Number,
-    required: true
+    required: true,
+    min: [3, 'Age must be at least 3'],
+    max: [25, 'Age must be less than 25']
   },
-  class: {
+  gradeLevel: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   grades: {
     type: [GradeSchema],
@@ -43,6 +64,16 @@ const StudentSchema: Schema = new Schema<IStudent>({
   }
 }, {
   timestamps: true
+});
+
+// Generate unique student ID before saving
+StudentSchema.pre('save', async function(next) {
+  if (!this.studentId) {
+    const year = new Date().getFullYear();
+    const count = await mongoose.model('Student').countDocuments();
+    this.studentId = `STU-${year}-${String(count + 1).padStart(4, '0')}`;
+  }
+  next();
 });
 
 export default mongoose.model<IStudent>('Student', StudentSchema)
