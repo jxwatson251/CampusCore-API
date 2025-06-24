@@ -2,8 +2,8 @@ import request from 'supertest';
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../../src/models/User';
-import authRoutes from '../../src/routes/authRoutes';
+import User from '../../../src/models/User';
+import authRoutes from '../../../src/routes/authRoutes';
 
 const app = express();
 app.use(express.json());

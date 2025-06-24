@@ -1,9 +1,9 @@
 import request from 'supertest';
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import Student from '../../src/models/Student';
-import User from '../../src/models/User';
-import studentRoutes from '../../src/routes/studentRoutes';
+import Student from '../../../src/models/Student';
+import User from '../../../src/models/User';
+import studentRoutes from '../../../src/routes/studentRoutes';
 
 const app = express();
 app.use(express.json());
