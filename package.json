@@ -9,8 +9,8 @@
     "test:coverage": "jest --coverage"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Jason A. Watson",
+  "license": "CITC",
   "dependencies": {
     "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
