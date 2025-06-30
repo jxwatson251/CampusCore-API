@@ -7,6 +7,7 @@ interface AuthRequest extends Request {
   user?: {
     userId: string;
     role: string;
+    studentId?: string;
   };
 }
 
@@ -24,7 +25,8 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = {
       userId: decoded.userId,
-      role: decoded.role
+      role: decoded.role,
+      ...(decoded.studentId && { studentId: decoded.studentId })
     };
     next();
   } catch (err) {
@@ -34,7 +36,6 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
-// Authorization middleware for admin-only routes
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ 
@@ -53,7 +54,6 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
   next();
 };
 
-// Authorization middleware for admin or teacher roles
 export const requireAdminOrTeacher = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ 
@@ -71,3 +71,39 @@ export const requireAdminOrTeacher = (req: AuthRequest, res: Response, next: Nex
 
   next();
 };
+
+export const requireStudent = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ 
+      error: 'Authentication required' 
+    });
+    return;
+  }
+
+  if (req.user.role !== 'student') {
+    res.status(403).json({ 
+      error: 'Access denied. Student privileges required.' 
+    });
+    return;
+  }
+
+  next();
+};
+
+export const requireAuthenticated = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ 
+      error: 'Authentication required' 
+    });
+    return;
+  }
+
+  if (!['admin', 'teacher', 'student'].includes(req.user.role)) {
+    res.status(403).json({ 
+      error: 'Access denied. Valid role required.' 
+    });
+    return;
+  }
+
+  next();
+}
