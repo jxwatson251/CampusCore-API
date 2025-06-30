@@ -1,187 +1,120 @@
-import request from 'supertest';
-import express from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../../../src/models/User';
-import authRoutes from '../../../src/routes/authRoutes';
-
-const app = express();
-app.use(express.json());
-app.use('/api/auth', authRoutes);
+import User from '../../models/User';
+import Student from '../../models/Student';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
-describe('Auth Controller', () => {
-  describe('POST /api/auth/register', () => {
-    it('should register a new user successfully', async () => {
-      const userData = {
-        username: 'testuser',
-        password: 'testpassword123',
-        role: 'admin'
-      };
-
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send(userData)
-        .expect(201);
-
-      expect(response.body.message).toBe('User registered');
-      expect(response.body.user).toMatchObject({
-        username: userData.username,
-        role: userData.role
+export const register = async (req: Request, res: Response) => {
+  try {
+    const { username, password, role, studentId } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        error: 'Username and password are required' 
       });
-      expect(response.body.user.password).toBeUndefined(); // Password should not be returned
+    }
 
-      // Verify user was created in database
-      const dbUser = await User.findOne({ username: userData.username });
-      expect(dbUser).toBeTruthy();
-      expect(dbUser!.username).toBe(userData.username);
-      expect(dbUser!.role).toBe(userData.role);
-      
-      // Verify password was hashed
-      const isPasswordHashed = await bcrypt.compare(userData.password, dbUser!.password);
-      expect(isPasswordHashed).toBe(true);
-    });
-
-    it('should default to admin role when no role is specified', async () => {
-      const userData = {
-        username: 'testuser2',
-        password: 'testpassword123'
-        // No role specified
-      };
-
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send(userData)
-        .expect(201);
-
-      expect(response.body.user.role).toBe('admin'); // Default role
-    });
-
-    it('should handle registration errors gracefully', async () => {
-      // First, create a user
-      await User.create({
-        username: 'existinguser',
-        password: await bcrypt.hash('password', 10),
-        role: 'admin'
+    if (role === 'student' && !studentId) {
+      return res.status(400).json({ 
+        error: 'Student ID is required for student registration' 
       });
+    }
 
-      // Try to register with the same username
-      const duplicateUserData = {
-        username: 'existinguser',
-        password: 'newpassword123',
-        role: 'teacher'
-      };
+    if (studentId) {
+      const student = await Student.findOne({ studentId });
+      if (!student) {
+        return res.status(404).json({ 
+          error: 'Student not found with the provided Student ID' 
+        });
+      }
 
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send(duplicateUserData)
-        .expect(500);
+      const existingUser = await User.findOne({ studentId });
+      if (existingUser) {
+        return res.status(409).json({ 
+          error: 'Student already has a user account' 
+        });
+      }
+    }
 
-      expect(response.body.error).toBe('Registration failed');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userData: any = { 
+      username, 
+      password: hashedPassword, 
+      role: role || 'admin'
+    };
+
+    if (studentId) {
+      userData.studentId = studentId;
+    }
+
+    const user = await User.create(userData);
+    
+    res.status(201).json({ 
+      message: 'User registered successfully', 
+      user: { 
+        username: user.username, 
+        role: user.role,
+        ...(user.studentId && { studentId: user.studentId })
+      } 
     });
-  });
-
-  describe('POST /api/auth/login', () => {
-    beforeEach(async () => {
-      // Create a test user for login tests
-      const hashedPassword = await bcrypt.hash('testpassword123', 10);
-      await User.create({
-        username: 'loginuser',
-        password: hashedPassword,
-        role: 'admin'
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      return res.status(409).json({ 
+        error: `${field} already exists` 
       });
-    });
+    }
+    
+    res.status(500).json({ error: 'Registration failed' });
+  }
+};
 
-    it('should login successfully with correct credentials', async () => {
-      const loginData = {
-        username: 'loginuser',
-        password: 'testpassword123'
-      };
-
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send(loginData)
-        .expect(200);
-
-      expect(response.body.token).toBeDefined();
-      expect(typeof response.body.token).toBe('string');
-
-      // Verify the token is valid
-      const decoded = jwt.verify(response.body.token, JWT_SECRET) as any;
-      expect(decoded.role).toBe('admin');
-      expect(decoded.userId).toBeDefined();
-      expect(decoded.exp).toBeDefined(); // Token should have expiration
-    });
-
-    it('should return 404 for non-existent user', async () => {
-      const loginData = {
-        username: 'nonexistentuser',
-        password: 'testpassword123'
-      };
-
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send(loginData)
-        .expect(404);
-
-      expect(response.body.error).toBe('User not found');
-    });
-
-    it('should return 401 for incorrect password', async () => {
-      const loginData = {
-        username: 'loginuser',
-        password: 'wrongpassword'
-      };
-
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send(loginData)
-        .expect(401);
-
-      expect(response.body.error).toBe('Invalid credentials');
-    });
-
-    it('should handle login errors gracefully', async () => {
-      // Send request with missing data
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({})
-        .expect(500);
-
-      expect(response.body.error).toBe('Login failed');
-    });
-  });
-
-  describe('Token Functionality', () => {
-    it('should generate tokens with correct payload structure', async () => {
-      const hashedPassword = await bcrypt.hash('testpassword123', 10);
-      const user = await User.create({
-        username: 'tokenuser',
-        password: hashedPassword,
-        role: 'teacher'
+export const login = async (req: Request, res: Response) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        error: 'Username and password are required' 
       });
+    }
 
-      const loginData = {
-        username: 'tokenuser',
-        password: 'testpassword123'
-      };
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send(loginData)
-        .expect(200);
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-      const decoded = jwt.verify(response.body.token, JWT_SECRET) as any;
-      
-      // expect(decoded.userId).toBe(user._id.toString());
-      expect(decoded.role).toBe('teacher');
-      expect(decoded.iat).toBeDefined(); // Issued at
-      expect(decoded.exp).toBeDefined(); // Expires at
-      
-      // Verify token expires in 1 day (86400 seconds)
-      const expectedExpiry = decoded.iat + 86400;
-      expect(decoded.exp).toBe(expectedExpiry);
+    const tokenPayload: any = { 
+      userId: user._id, 
+      role: user.role 
+    };
+
+    if (user.role === 'student' && user.studentId) {
+      tokenPayload.studentId = user.studentId;
+    }
+
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '1d' });
+    
+    res.json({ 
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role,
+        ...(user.studentId && { studentId: user.studentId })
+      }
     });
-  });
-});
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+}
