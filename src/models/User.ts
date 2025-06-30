@@ -3,7 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   username: string;
   password: string;
-  role: 'admin' | 'teacher'; // You can expand roles if needed
+  role: 'admin' | 'teacher' | 'student';
+  studentId?: string;
 }
 
 const UserSchema: Schema = new Schema<IUser>({
@@ -19,11 +20,22 @@ const UserSchema: Schema = new Schema<IUser>({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher'],
+    enum: ['admin', 'teacher', 'student'],
     default: 'admin'
+  },
+  studentId: {
+    type: String,
+    ref: 'Student',
+    required: function(this: IUser) {
+      return this.role === 'student';
+    },
+    unique: true,
+    sparse: true
   }
 }, {
   timestamps: true
 });
+
+UserSchema.index({ studentId: 1 });
 
 export default mongoose.model<IUser>('User', UserSchema);
