@@ -7,15 +7,18 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/authRoutes';
 import studentRoutes from './routes/studentRoutes';
 import gradeRoutes from './routes/gradeRoutes';
+import studentSelfServiceRoutes from './routes/studentSelfServiceRoutes';
 
 const app: Application = express();
 
 app.use(cors());
 app.use(express.json());
 
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/grades', gradeRoutes);
+app.use('/api/student', studentSelfServiceRoutes); // Student self-service routes
 
 app.get('/', (req, res) => {
   res.send('Campus Core API is running');
@@ -57,6 +60,7 @@ mongoose.connect(MONGO_URI)
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
       console.log(`👥 Student endpoints: http://localhost:${PORT}/api/students`);
       console.log(`📊 Grade endpoints: http://localhost:${PORT}/api/grades`);
+      console.log(`🎓 Student self-service: http://localhost:${PORT}/api/student`);
     });
   })
   .catch((error) => {
