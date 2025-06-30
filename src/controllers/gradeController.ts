@@ -1,116 +1,35 @@
 import { Request, Response } from 'express';
 import Student from '../models/Student';
-import mongoose from 'mongoose';
 
 interface AuthRequest extends Request {
   user?: {
     userId: string;
     role: string;
+    studentId?: string;
   };
 }
 
-export const addOrUpdateGrade = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getMyGrades = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { studentId } = req.params;
-    const { subject, score } = req.body;
-
-    if (!subject || score === undefined || score === null) {
-      res.status(400).json({ 
-        error: 'Missing required fields',
-        required: ['subject', 'score'],
-        received: {
-          subject: !!subject,
-          score: score !== undefined && score !== null
-        }
+    if (!req.user || req.user.role !== 'student') {
+      res.status(403).json({ 
+        error: 'Access denied. Student role required.' 
       });
       return;
     }
 
-    if (typeof score !== 'number' || score < 0 || score > 100) {
+    const { studentId } = req.user;
+    if (!studentId) {
       res.status(400).json({ 
-        error: 'Score must be a number between 0 and 100' 
+        error: 'Student ID not found in authentication token' 
       });
       return;
     }
 
-    if (typeof subject !== 'string' || subject.trim().length === 0) {
-      res.status(400).json({ 
-        error: 'Subject must be a non-empty string' 
-      });
-      return;
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(studentId)) {
-      res.status(400).json({ 
-        error: 'Invalid student ID format' 
-      });
-      return;
-    }
-
-    const student = await Student.findById(studentId);
+    const student = await Student.findOne({ studentId }, 'name studentId grades');
     if (!student) {
       res.status(404).json({ 
-        error: 'Student not found' 
-      });
-      return;
-    }
-
-    const subjectTrimmed = subject.trim();
-    const existingGradeIndex = student.grades.findIndex(
-      grade => grade.subject.toLowerCase() === subjectTrimmed.toLowerCase()
-    );
-
-    let action: 'added' | 'updated';
-    
-    if (existingGradeIndex !== -1) {
-      student.grades[existingGradeIndex].score = score;
-      action = 'updated';
-    } else {
-      student.grades.push({ subject: subjectTrimmed, score });
-      action = 'added';
-    }
-
-    await student.save();
-
-    res.json({
-      success: true,
-      message: `Grade ${action} successfully`,
-      grade: {
-        subject: subjectTrimmed,
-        score,
-        action
-      },
-      student: {
-        id: student._id,
-        name: student.name,
-        studentId: student.studentId
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Error adding/updating grade:', error);
-    res.status(500).json({ 
-      error: 'Failed to add/update grade',
-      message: 'An internal server error occurred'
-    });
-  }
-};
-
-export const getStudentGrades = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { studentId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(studentId)) {
-      res.status(400).json({ 
-        error: 'Invalid student ID format' 
-      });
-      return;
-    }
-
-    const student = await Student.findById(studentId, 'name studentId grades');
-    if (!student) {
-      res.status(404).json({ 
-        error: 'Student not found' 
+        error: 'Student record not found' 
       });
       return;
     }
@@ -121,11 +40,15 @@ export const getStudentGrades = async (req: AuthRequest, res: Response): Promise
       averageGrade = Math.round((totalScore / student.grades.length) * 100) / 100;
     }
 
+    const gradesBySubject = student.grades.reduce((acc, grade) => {
+      acc[grade.subject] = grade.score;
+      return acc;
+    }, {} as Record<string, number>);
+
     res.json({
       success: true,
-      message: 'Student grades retrieved successfully',
+      message: 'Grades retrieved successfully',
       student: {
-        id: student._id,
         name: student.name,
         studentId: student.studentId,
         gradesCount: student.grades.length,
@@ -134,51 +57,65 @@ export const getStudentGrades = async (req: AuthRequest, res: Response): Promise
       grades: student.grades.map(grade => ({
         subject: grade.subject,
         score: grade.score
-      }))
+      })),
+      gradesBySubject,
+      summary: {
+        totalSubjects: student.grades.length,
+        averageGrade,
+        highestGrade: student.grades.length > 0 ? Math.max(...student.grades.map(g => g.score)) : null,
+        lowestGrade: student.grades.length > 0 ? Math.min(...student.grades.map(g => g.score)) : null
+      }
     });
 
   } catch (error: any) {
     console.error('Error fetching student grades:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch student grades',
+      error: 'Failed to fetch grades',
       message: 'An internal server error occurred'
     });
   }
 };
 
-export const removeGrade = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getMyGradeBySubject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { studentId } = req.params;
-    const { subject } = req.body;
-
-    if (!subject || typeof subject !== 'string' || subject.trim().length === 0) {
-      res.status(400).json({ 
-        error: 'Subject is required and must be a non-empty string' 
+    if (!req.user || req.user.role !== 'student') {
+      res.status(403).json({ 
+        error: 'Access denied. Student role required.' 
       });
       return;
     }
 
-    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    const { subject } = req.params;
+    const { studentId } = req.user;
+
+    if (!studentId) {
       res.status(400).json({ 
-        error: 'Invalid student ID format' 
+        error: 'Student ID not found in authentication token' 
       });
       return;
     }
 
-    const student = await Student.findById(studentId);
+    if (!subject || subject.trim().length === 0) {
+      res.status(400).json({ 
+        error: 'Subject parameter is required' 
+      });
+      return;
+    }
+
+    const student = await Student.findOne({ studentId }, 'name studentId grades');
     if (!student) {
       res.status(404).json({ 
-        error: 'Student not found' 
+        error: 'Student record not found' 
       });
       return;
     }
 
     const subjectTrimmed = subject.trim();
-    const gradeIndex = student.grades.findIndex(
-      grade => grade.subject.toLowerCase() === subjectTrimmed.toLowerCase()
+    const grade = student.grades.find(
+      g => g.subject.toLowerCase() === subjectTrimmed.toLowerCase()
     );
 
-    if (gradeIndex === -1) {
+    if (!grade) {
       res.status(404).json({ 
         error: 'Grade not found for the specified subject',
         availableSubjects: student.grades.map(g => g.subject)
@@ -186,108 +123,110 @@ export const removeGrade = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const removedGrade = student.grades[gradeIndex];
-    student.grades.splice(gradeIndex, 1);
-    await student.save();
-
     res.json({
       success: true,
-      message: 'Grade removed successfully',
-      removedGrade: {
-        subject: removedGrade.subject,
-        score: removedGrade.score
-      },
+      message: `Grade for ${grade.subject} retrieved successfully`,
       student: {
-        id: student._id,
         name: student.name,
         studentId: student.studentId
+      },
+      grade: {
+        subject: grade.subject,
+        score: grade.score
       }
     });
 
   } catch (error: any) {
-    console.error('Error removing grade:', error);
+    console.error('Error fetching grade by subject:', error);
     res.status(500).json({ 
-      error: 'Failed to remove grade',
+      error: 'Failed to fetch grade',
       message: 'An internal server error occurred'
     });
   }
 };
 
-export const getGradesSummary = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getMyAcademicSummary = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const subject = req.query.subject as string;
-    const skip = (page - 1) * limit;
+    if (!req.user || req.user.role !== 'student') {
+      res.status(403).json({ 
+        error: 'Access denied. Student role required.' 
+      });
+      return;
+    }
 
-    const pipeline: any[] = [
-      {
-        $project: {
-          name: 1,
-          studentId: 1,
-          grades: 1,
-          gradesCount: { $size: '$grades' },
-          averageGrade: {
-            $cond: {
-              if: { $gt: [{ $size: '$grades' }, 0] },
-              then: { $avg: '$grades.score' },
-              else: null
-            }
-          }
-        }
-      }
-    ];
+    const { studentId } = req.user;
+    if (!studentId) {
+      res.status(400).json({ 
+        error: 'Student ID not found in authentication token' 
+      });
+      return;
+    }
 
-    if (subject && subject.trim()) {
-      pipeline.unshift({
-        $match: {
-          'grades.subject': { $regex: new RegExp(subject.trim(), 'i') }
-        }
+    const student = await Student.findOne({ studentId });
+    if (!student) {
+      res.status(404).json({ 
+        error: 'Student record not found' 
+      });
+      return;
+    }
+
+    const grades = student.grades;
+    let academicSummary = {
+      totalSubjects: grades.length,
+      averageGrade: null as number | null,
+      highestGrade: null as { subject: string; score: number } | null,
+      lowestGrade: null as { subject: string; score: number } | null,
+      gradeDistribution: {
+        A: 0,  // 90-100
+        B: 0,  // 80-89
+        C: 0,  // 70-79
+        D: 0,  // 60-69
+        F: 0   // Below 60
+      },
+      subjectGrades: grades.map(g => ({ subject: g.subject, score: g.score }))
+    };
+
+    if (grades.length > 0) {
+      const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
+      academicSummary.averageGrade = Math.round((totalScore / grades.length) * 100) / 100;
+
+      const sortedGrades = [...grades].sort((a, b) => b.score - a.score);
+      academicSummary.highestGrade = {
+        subject: sortedGrades[0].subject,
+        score: sortedGrades[0].score
+      };
+      academicSummary.lowestGrade = {
+        subject: sortedGrades[sortedGrades.length - 1].subject,
+        score: sortedGrades[sortedGrades.length - 1].score
+      };
+
+      grades.forEach(grade => {
+        if (grade.score >= 90) academicSummary.gradeDistribution.A++;
+        else if (grade.score >= 80) academicSummary.gradeDistribution.B++;
+        else if (grade.score >= 70) academicSummary.gradeDistribution.C++;
+        else if (grade.score >= 60) academicSummary.gradeDistribution.D++;
+        else academicSummary.gradeDistribution.F++;
       });
     }
 
-    pipeline.push({ $skip: skip }, { $limit: limit });
-
-    const students = await Student.aggregate(pipeline);
-    const totalStudents = await Student.countDocuments(
-      subject ? { 'grades.subject': { $regex: new RegExp(subject.trim(), 'i') } } : {}
-    );
-    const totalPages = Math.ceil(totalStudents / limit);
-
-    const formattedStudents = students.map(student => ({
-      id: student._id,
-      name: student.name,
-      studentId: student.studentId,
-      gradesCount: student.gradesCount,
-      averageGrade: student.averageGrade ? Math.round(student.averageGrade * 100) / 100 : null,
-      grades: subject 
-        ? student.grades.filter((g: any) => 
-            g.subject.toLowerCase().includes(subject.toLowerCase())
-          )
-        : student.grades
-    }));
-
     res.json({
       success: true,
-      message: 'Grades summary retrieved successfully',
-      filters: {
-        subject: subject || null
+      message: 'Academic summary retrieved successfully',
+      student: {
+        name: student.name,
+        studentId: student.studentId,
+        email: student.email,
+        age: student.age,
+        gradeLevel: student.gradeLevel
       },
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalStudents,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1
-      },
-      students: formattedStudents
+      academicSummary
     });
 
   } catch (error: any) {
-    console.error('Error fetching grades summary:', error);
+    console.error('Error fetching academic summary:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch grades summary',
+      error: 'Failed to fetch academic summary',
       message: 'An internal server error occurred'
     });
   }
-};
+}
