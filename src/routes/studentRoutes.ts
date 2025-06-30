@@ -1,14 +1,24 @@
 import express from 'express';
-import { addStudent, getAllStudents, getStudentById } from '../controllers/studentController';
-import { authenticate, requireAdmin, requireAdminOrTeacher } from '../middlewares/authMiddleware';
+import { 
+  getMyGrades, 
+  getMyGradeBySubject, 
+  getMyAcademicSummary 
+} from '../controllers/studentGradesController';
+import { authenticate, requireStudent } from '../middlewares/authMiddleware';
 
 const router = express.Router();
 
-// Admin only routes
-router.post('/', authenticate, requireAdmin, addStudent);
+// All routes require authentication and student role
+router.use(authenticate);
+router.use(requireStudent);
 
-// Admin and Teacher routes
-router.get('/', authenticate, requireAdminOrTeacher, getAllStudents);
-router.get('/:id', authenticate, requireAdminOrTeacher, getStudentById);
+// GET /api/student/grades - Get all my grades
+router.get('/grades', getMyGrades);
 
-export default router;
+// GET /api/student/grades/:subject - Get grade for specific subject
+router.get('/grades/:subject', getMyGradeBySubject);
+
+// GET /api/student/summary - Get comprehensive academic summary
+router.get('/summary', getMyAcademicSummary);
+
+export default router
