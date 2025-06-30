@@ -66,7 +66,6 @@ const StudentSchema: Schema = new Schema<IStudent>({
   timestamps: true
 });
 
-// Generate unique student ID before saving
 StudentSchema.pre('save', async function(next) {
   if (!this.studentId) {
     try {
@@ -82,4 +81,4 @@ StudentSchema.pre('save', async function(next) {
   }
 });
 
-export default mongoose.model<IStudent>('Student', StudentSchema);
+export default mongoose.model<IStudent>('Student', StudentSchema)

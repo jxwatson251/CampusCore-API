@@ -14,11 +14,10 @@ const app: Application = express();
 app.use(cors());
 app.use(express.json());
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/grades', gradeRoutes);
-app.use('/api/student', studentSelfServiceRoutes); // Student self-service routes
+app.use('/api/student', studentSelfServiceRoutes);
 
 app.get('/', (req, res) => {
   res.send('Campus Core API is running');
@@ -50,17 +49,16 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-// MongoDB connection
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected successfully');
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📡 API available at http://localhost:${PORT}`);
-      console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
-      console.log(`👥 Student endpoints: http://localhost:${PORT}/api/students`);
-      console.log(`📊 Grade endpoints: http://localhost:${PORT}/api/grades`);
-      console.log(`🎓 Student self-service: http://localhost:${PORT}/api/student`);
+      console.log(` Server is running on port ${PORT}`);
+      console.log(` API available at http://localhost:${PORT}`);
+      console.log(` Auth endpoints: http://localhost:${PORT}/api/auth`);
+      console.log(` Student endpoints: http://localhost:${PORT}/api/students`);
+      console.log(` Grade endpoints: http://localhost:${PORT}/api/grades`);
+      console.log(` Student self-service: http://localhost:${PORT}/api/student`);
     });
   })
   .catch((error) => {

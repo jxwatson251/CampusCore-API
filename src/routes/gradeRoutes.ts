@@ -17,4 +17,4 @@ router.get('/student/:studentId', getStudentGrades);
 router.delete('/student/:studentId', removeGrade);
 router.get('/summary', getGradesSummary);
 
-export default router;
+export default router

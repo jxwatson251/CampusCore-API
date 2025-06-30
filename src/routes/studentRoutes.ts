@@ -4,11 +4,9 @@ import { authenticate, requireAdmin, requireAdminOrTeacher } from '../middleware
 
 const router = express.Router();
 
-// Admin only routes
 router.post('/', authenticate, requireAdmin, addStudent);
 
-// Admin and Teacher routes
 router.get('/', authenticate, requireAdminOrTeacher, getAllStudents);
 router.get('/:id', authenticate, requireAdminOrTeacher, getStudentById);
 
-export default router;
+export default router
