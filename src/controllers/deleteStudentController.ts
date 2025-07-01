@@ -53,7 +53,7 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<vo
 
     // Store student data for response before deletion
     const studentData = {
-      id: student._id.toString(),
+      id: (student._id as mongoose.Types.ObjectId).toString(),
       studentId: student.studentId,
       name: student.name,
       email: student.email,
@@ -140,7 +140,7 @@ export const bulkDeleteStudents = async (req: AuthRequest, res: Response): Promi
 
         if (hasActiveEnrollments.hasActive) {
           deletionResults.blockedByEnrollments.push({
-            id: student._id,
+            id: (student._id as mongoose.Types.ObjectId).toString(),
             studentId: student.studentId,
             name: student.name,
             activeEnrollments: hasActiveEnrollments.enrollments
@@ -149,21 +149,21 @@ export const bulkDeleteStudents = async (req: AuthRequest, res: Response): Promi
           await Student.findByIdAndDelete(student._id);
           
           deletionResults.successful.push({
-            id: student._id,
+            id: (student._id as mongoose.Types.ObjectId).toString(),
             studentId: student.studentId,
             name: student.name,
             email: student.email
           });
 
           console.log(`Student deleted in bulk operation by admin ${req.user.userId}:`, {
-            studentId: student._id,
+            studentId: (student._id as mongoose.Types.ObjectId).toString(),
             studentName: student.name,
             timestamp: new Date().toISOString()
           });
         }
       } catch (error) {
         deletionResults.failed.push({
-          id: student._id,
+          id: (student._id as mongoose.Types.ObjectId).toString(),
           studentId: student.studentId,
           name: student.name,
           error: 'Deletion failed due to server error'
@@ -241,7 +241,7 @@ export const checkStudentDeletable = async (req: AuthRequest, res: Response): Pr
     res.json({
       success: true,
       student: {
-        id: student._id,
+        id: (student._id as mongoose.Types.ObjectId).toString(),
         studentId: student.studentId,
         name: student.name,
         email: student.email
@@ -288,52 +288,13 @@ async function checkActiveEnrollments(
         enrolledAt: enrollment.createdAt
       }))
     };
-    // Option 2: If enrollments are stored in a courses collection
-    /*
-    const coursesWithStudent = await Course.find({
-      'enrollments.studentId': { $in: [studentObjectId, studentId] },
-      'enrollments.status': { $in: ['active', 'enrolled', 'in_progress'] }
-    });
-
-    const activeEnrollments = coursesWithStudent.flatMap(course => 
-      course.enrollments
-        .filter(enrollment => 
-          (enrollment.studentId === studentObjectId || enrollment.studentId === studentId) &&
-          ['active', 'enrolled', 'in_progress'].includes(enrollment.status)
-        )
-        .map(enrollment => ({
-          courseId: course._id,
-          courseName: course.name,
-          courseCode: course.code,
-          status: enrollment.status,
-          enrolledAt: enrollment.enrolledAt
-        }))
-    );
-
-    return {
-      hasActive: activeEnrollments.length > 0,
-      enrollments: activeEnrollments
-    };
-    */
-
-    // Option 3: Placeholder implementation - replace with your actual logic
-    // For now, we'll assume no active enrollments to allow deletions
-    // You should replace this with your actual enrollment checking logic
     
-    console.log(`Checking enrollments for student ${studentId} (${studentObjectId})`);
-    
-    // TODO: Implement actual enrollment checking based on your data model
-    // This is a placeholder that always returns no active enrollments
-    return {
-      hasActive: false,
-      enrollments: []
-    };
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error checking active enrollments:', error);
+    // Return safe defaults in case of error
     return {
-      hasActive: true,
-      enrollments: [{ error: 'Could not verify enrollment status' }]
+      hasActive: true, // Err on the side of caution - prevent deletion if we can't check
+      enrollments: []
     };
   }
 }
