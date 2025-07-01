@@ -38,4 +38,4 @@ const UserSchema: Schema = new Schema<IUser>({
 
 UserSchema.index({ studentId: 1 });
 
-export default mongoose.model<IUser>('User', UserSchema);
+export default mongoose.model<IUser>('User', UserSchema)

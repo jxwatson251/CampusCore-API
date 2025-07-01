@@ -6,11 +6,21 @@
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "start": "npx ts-node src/app.ts",
+    "build": "tsc"
   },
-  "keywords": [],
+  "keywords": [
+    "Admin",
+    "Teacher",
+    "Student",
+    "Enrollment",
+    "Academy",
+    "Subject",
+    "Grades"
+  ],
   "author": "Jason A. Watson",
-  "license": "CITC",
+  "license": "CITC LLC",
   "dependencies": {
     "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
@@ -37,5 +47,14 @@
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
   },
-  "description": ""
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxwatson251/CampusCore-API.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jxwatson251/CampusCore-API/issues"
+  },
+  "homepage": "https://github.com/jxwatson251/CampusCore-API#readme"
 }

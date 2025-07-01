@@ -22,4 +22,4 @@ export const login = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(401).json({ error: 'Login failed' });
   }
-};
+}
