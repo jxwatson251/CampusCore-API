@@ -1,4 +1,3 @@
-// src/controllers/gradeController.ts
 import { Request, Response } from 'express';
 import Student from '../models/Student';
 import mongoose from 'mongoose';

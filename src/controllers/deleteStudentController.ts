@@ -22,7 +22,6 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<vo
 
     const { id } = req.params;
 
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ 
         error: 'Invalid student ID format' 
@@ -30,7 +29,6 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Find the student first
     const student = await Student.findById(id);
     if (!student) {
       res.status(404).json({ 
@@ -39,7 +37,6 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Check for active enrollments
     const hasActiveEnrollments = await checkActiveEnrollments(id, student.studentId);
     if (hasActiveEnrollments.hasActive) {
       res.status(409).json({
@@ -51,7 +48,6 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Store student data for response before deletion
     const studentData = {
       id: (student._id as mongoose.Types.ObjectId).toString(),
       studentId: student.studentId,
